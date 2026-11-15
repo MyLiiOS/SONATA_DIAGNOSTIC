@@ -62,6 +62,7 @@ private fun SonataScreen() {
     var busy by remember { mutableStateOf(false) }
     var dtcResult by remember { mutableStateOf<DTCReadResult?>(null) }
     var dtcTitle by remember { mutableStateOf("") }
+    var protocolReport by remember { mutableStateOf("") }
 
     fun refreshDevices() {
         if (adapter == null) {
@@ -234,6 +235,59 @@ private fun SonataScreen() {
         }
     }
 
+    fun runProtocolDiagnostics() {
+        val manager = obdManager
+
+        if (manager == null || connection?.isConnected != true) {
+            status = "Сначала подключитесь к адаптеру"
+            return
+        }
+
+        scope.launch {
+            busy = true
+            protocolReport = "Выполняется диагностика..."
+
+            val commands = listOf(
+                "ATDP",
+                "ATDPN",
+                "0100",
+                "010C",
+                "010B"
+            )
+
+            val report = StringBuilder()
+
+            try {
+                for (command in commands) {
+                    val response = manager.execute(
+                        OBDCommand(
+                            command = command,
+                            description = "Диагностика протокола: $command",
+                            timeoutMs = if (command.startsWith("01")) 6000 else 2000,
+                            requiresEcuResponse = command.startsWith("01")
+                        )
+                    )
+
+                    report.append(command)
+                    report.append(": ")
+                    report.append(
+                        response.rawData.ifBlank {
+                            response.errorMessage ?: "Пустой ответ"
+                        }
+                    )
+                    report.append("\\n")
+                }
+
+                protocolReport = report.toString()
+            } catch (error: Exception) {
+                protocolReport = report.toString() +
+                    "Ошибка: ${error.message ?: error.javaClass.simpleName}"
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun readDtc(mode: Int, title: String) {
         val manager = obdManager
 
@@ -357,6 +411,21 @@ private fun SonataScreen() {
                         enabled = !busy
                     ) {
                         Text("Проверить связь с ЭБУ")
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Button(
+                        onClick = { runProtocolDiagnostics() },
+                        enabled = !busy
+                    ) {
+                        Text("Диагностика протокола")
+                    }
+
+                    if (protocolReport.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Результаты диагностики", fontSize = 18.sp)
+                        Text(protocolReport)
                     }
 
                     Spacer(Modifier.height(8.dp))
