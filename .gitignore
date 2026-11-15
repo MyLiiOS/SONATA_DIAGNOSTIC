@@ -6,3 +6,12 @@ local.properties
 *.aab
 .idea/
 .DS_Store
+
+# Local reverse-engineering research files
+/analysis/
+/out/
+/tools/apk/
+/tools/pyxamstore
+/assemblies.json
+/carscanner_classes.txt
+/diagnostic_classes.txt
